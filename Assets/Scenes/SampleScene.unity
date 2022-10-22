@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 705507994}
-  m_IndirectSpecularColor: {r: 0.18028378, g: 0.22571412, b: 0.30692285, a: 1}
+  m_IndirectSpecularColor: {r: 0.18028334, g: 0.22571328, b: 0.3069217, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -152,13 +152,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd3c1eb90b76f37468fe2ac05eb820a0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  amountOfFish: 5000
-  spawnBounds: {x: 470, y: 47, z: 470}
-  objectPrefab: {fileID: 6846249514153696472, guid: a75a1491c3ea08d48b7e66c64c4115c1, type: 3}
+  hordeSize: 1000
+  spawnBounds: {x: 200, y: 0, z: 200}
   spawnHeight: 0
-  swimSpeed: 30
-  turnSpeed: 4.6
-  swimChangeFrequency: 250
+  zombiePrefab: {fileID: 6846249514153696472, guid: a75a1491c3ea08d48b7e66c64c4115c1, type: 3}
+  moveSpeed: 2
+  moveTime: 8
+  idleTime: 4
+  interactionDistance: 20
+  diskSize: 8
+  wanderChance: 0
+  neighborLimit: 99999
+  TimeScale: 5
+  restitution: 0
 --- !u!4 &571129387
 Transform:
   m_ObjectHideFlags: 0
@@ -344,8 +350,8 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
-  m_LocalRotation: {x: -0.09499011, y: 0.9047763, z: -0.30416706, w: -0.28255832}
-  m_LocalPosition: {x: 123.28829, y: 125.14174, z: 126.500336}
+  m_LocalRotation: {x: -0.4149586, y: 0.56319815, z: -0.3905447, w: -0.59840786}
+  m_LocalPosition: {x: 16.076996, y: 41.36876, z: -1.9301882}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
