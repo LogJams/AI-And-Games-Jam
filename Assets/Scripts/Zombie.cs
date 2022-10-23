@@ -6,20 +6,31 @@ public class Zombie : MonoBehaviour {
 
     public int index;
 
+
     // Start is called before the first frame update
     void Start() {
-        
+        GameManager.instance.OnNoiseEvent += OnNoiseTrigger;
     }
 
-    // Update is called once per frame
-    void Update() {
-        
+    
+
+
+    public void OnNoiseTrigger(System.Object src, NoiseEvent e) {
+        if ( (transform.position - e.location).sqrMagnitude <= e.sqRange ) {
+            HordeManager.instance.ZombieTrigger(index, e.location);
+        }
     }
+
 
     private void OnCollisionEnter(Collision collision) {
         Zombie zed = null;
+        //if it's another zombie, move with it
         if (collision.gameObject.TryGetComponent(out zed)) {
             HordeManager.instance.OnZombieCollision(index, zed.index);
+        }
+        //otherwise just stop
+        else {
+            HordeManager.instance.OnZombieCollision(index);
         }
     }
 }

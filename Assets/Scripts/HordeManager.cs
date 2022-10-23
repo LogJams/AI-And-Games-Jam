@@ -20,13 +20,19 @@ public class HordeManager : MonoBehaviour {
     private NativeArray<Vector3> position, velocity;
     private NativeArray<Vector3> nbPosition, nbVelocity;
     private NativeArray<float> timer;
-    private NativeArray<int> numNeighbors;
+    private NativeArray<bool> triggered;
 
+    private NativeArray<Vector3> playerPosition;
+
+    private Queue<int> triggerBuffer;
+    private Queue<Vector3> triggerLocations;
+    private Queue<int> unTriggerBuffer;
+
+    [Header("Horde Parameters")]
     public int hordeSize = 10000;
 
     public Vector3 spawnBounds = new Vector3(100, 0, 100);
     public float spawnHeight = 0f;
-
 
     public Transform zombiePrefab;
 
@@ -35,10 +41,10 @@ public class HordeManager : MonoBehaviour {
     private DynamicsJob dynamicsJob;
     private JobHandle dynamicsHandle;
 
-    private NbhdJob nbhdJob;
+    private BehaviorJob behaviorJob;
     private JobHandle nbhdHandle;
 
-
+    [Header("Zombie Behavior Settings")]
     public float moveSpeed = 1.0f;
     public float moveTime = 2.5f;
     public float idleTime = 5.5f;
@@ -46,13 +52,14 @@ public class HordeManager : MonoBehaviour {
     public float interactionDistance = 10f;
     public float diskSize = 5.0f;
     public float wanderChance = 0.3f;
-    public int neighborLimit = 6;
+    public float restitution = 0.8f;
+
+
+    [Header("Player Reference")]
+    public Transform player; public float playerTrackDistance = 5f;
 
     Vector3 centroid;
 
-    public float TimeScale = 1f;
-
-    public float restitution = 0.8f;
 
     private void Awake() {
         if (instance != null && instance != this) {
@@ -65,9 +72,6 @@ public class HordeManager : MonoBehaviour {
     }
 
     void Start() {
-
-        Time.timeScale = TimeScale;
-
         position   = new NativeArray<Vector3>(hordeSize, Allocator.Persistent);
         velocity   = new NativeArray<Vector3>(hordeSize, Allocator.Persistent);
         nbPosition = new NativeArray<Vector3>(hordeSize, Allocator.Persistent);
@@ -77,7 +81,14 @@ public class HordeManager : MonoBehaviour {
 
         timer = new NativeArray<float>(hordeSize, Allocator.Persistent);
 
-        numNeighbors = new NativeArray<int>(hordeSize, Allocator.Persistent);
+        triggered = new NativeArray<bool>(hordeSize, Allocator.Persistent);
+        
+        triggerBuffer = new Queue<int>();
+        unTriggerBuffer = new Queue<int>();
+        triggerLocations = new Queue<Vector3>();
+
+        playerPosition = new NativeArray<Vector3>(1,Allocator.Persistent);
+        playerPosition[0] = player.position;
 
         for (int i = 0; i < hordeSize; i++) {
 
@@ -88,6 +99,7 @@ public class HordeManager : MonoBehaviour {
 
             Transform t = (Transform)Instantiate(zombiePrefab, spawnPoint, Quaternion.identity);
             t.GetComponent<Zombie>().index = i;
+            t.parent = this.transform;
 
             transforms.Add(t);
 
@@ -98,18 +110,20 @@ public class HordeManager : MonoBehaviour {
             nbPosition[i] = new Vector3(0, 0, 0);
 
             timer[i] = Random.Range(0, moveTime + idleTime);
-            numNeighbors[i] = 0;
+            triggered[i] = false;
         }
 
 
         //neighborhood update job
-        nbhdJob = new NbhdJob() {
+        behaviorJob = new BehaviorJob() {
+            playerPosition = this.playerPosition,
             positions = position,
             velocities = velocity,
             interactionDistance = this.interactionDistance,
             avgVelocity = nbVelocity,
             avgPosition = nbPosition,
-            numNeighbors = this.numNeighbors,
+            triggered = this.triggered,
+            playerTrackDistance = this.playerTrackDistance,
         };
 
         //agent dynamics job
@@ -126,8 +140,7 @@ public class HordeManager : MonoBehaviour {
             diskSize = this.diskSize,
             time = (uint)System.DateTime.UtcNow.Second,
             wanderChance = this.wanderChance,
-            neighborLimit = this.neighborLimit,
-            numNeighbors = this.numNeighbors,
+            triggered = this.triggered,
         };
 
 
@@ -137,8 +150,11 @@ public class HordeManager : MonoBehaviour {
     // Update is called once per frame
     void Update() {
 
+        //update the player position nativearray before jobs start
+        playerPosition[0] = player.position;
+
         //job 1: update all neighborhood info
-        nbhdHandle = nbhdJob.Schedule(transforms);
+        nbhdHandle = behaviorJob.Schedule(transforms);
 
         foreach (var p in position) {
             centroid += p;
@@ -154,6 +170,17 @@ public class HordeManager : MonoBehaviour {
 
     private void LateUpdate() {
         dynamicsHandle.Complete();
+
+        //manage the buffers that update nativearray info
+        while (triggerBuffer.Count > 0) {
+            int idx = triggerBuffer.Dequeue();
+            triggered[idx] = true;
+            nbPosition[idx] = triggerLocations.Dequeue();
+            nbVelocity[idx] = Vector3.zero;
+        }
+        while (unTriggerBuffer.Count > 0) {
+            triggered[unTriggerBuffer.Dequeue()] = false;
+        }
     }
 
     public void OnZombieCollision(int idx) {
@@ -168,6 +195,17 @@ public class HordeManager : MonoBehaviour {
         velocity[other] = vel;
     }
 
+    public void ZombieTrigger(int idx, Vector3 location) {
+        //todo: handle this in a trigger queue that's updated after dynamicsHandle is completed
+        triggerBuffer.Enqueue(idx);
+        triggerLocations.Enqueue(location);
+    }
+
+    public void ZombieUnTrigger(int idx) {
+        //todo: handle this in a trigger queue that's updated after dynamicsHandle is completed
+        unTriggerBuffer.Enqueue(idx);
+    }
+
     private void OnDestroy() {
         position.Dispose();
         velocity.Dispose();
@@ -175,23 +213,40 @@ public class HordeManager : MonoBehaviour {
         nbVelocity.Dispose();
         nbPosition.Dispose();
         timer.Dispose();
-        numNeighbors.Dispose();
+        triggered.Dispose();
+        playerPosition.Dispose();
     }
 
 
     [BurstCompile]
-    struct NbhdJob : IJobParallelForTransform {
+    struct BehaviorJob : IJobParallelForTransform {
         public NativeArray<Vector3> avgVelocity;
         public NativeArray<Vector3> avgPosition;
 
         [ReadOnly] public NativeArray<Vector3> positions;
         [ReadOnly] public NativeArray<Vector3> velocities;
+        [ReadOnly] public NativeArray<Vector3> playerPosition;
 
-        public NativeArray<int> numNeighbors;
+
+        public NativeArray<bool> triggered;
 
         public float interactionDistance;
+        public float playerTrackDistance;
 
         public void Execute(int i, TransformAccess transform) {
+            Vector3 player = playerPosition[0];
+
+            //check if the player is TRIGGERING us
+            //track the player if we have LoS to them and they've triggered us
+            if ((player - transform.position).sqrMagnitude <= playerTrackDistance * playerTrackDistance) {
+                avgPosition[i] = player;
+                triggered[i] = true;
+            }
+
+
+            //exit out if we've been triggered by something else
+            if (triggered[i]) return;
+
             //read current position and velocity to calculate avg values
             avgPosition[i] = positions[i];
             avgVelocity[i] = velocities[i];
@@ -207,20 +262,18 @@ public class HordeManager : MonoBehaviour {
             //take the average
             avgPosition[i] /= count;
             avgVelocity[i] /= count;
-            numNeighbors[i] = count - 1;
         }
-
     }
-
 
     [BurstCompile]
     struct DynamicsJob : IJobParallelForTransform {
         public NativeArray<Vector3> positions;
         public NativeArray<Vector3> velocities;
+        public NativeArray<float> timer;
 
         [ReadOnly] public NativeArray<Vector3> avgVelocity;
         [ReadOnly] public NativeArray<Vector3> avgPosition;
-        [ReadOnly] public NativeArray<int> numNeighbors;
+        public NativeArray<bool> triggered;
 
         public Vector3 bounds;
 
@@ -233,12 +286,10 @@ public class HordeManager : MonoBehaviour {
 
         public float diskSize;
         public float wanderChance;
-        public int neighborLimit;
 
         public Vector3 centroid;
 
 
-        public NativeArray<float> timer;
 
 
         public void Execute(int i, TransformAccess transform) {
@@ -246,23 +297,30 @@ public class HordeManager : MonoBehaviour {
             timer[i] += deltaTime;
 
             //we are moving!
-            if (timer[i] > idleTime && timer[i] < idleTime + deltaTime) {
+            if ( (timer[i] > idleTime && timer[i] < idleTime + deltaTime) || triggered[i]) {
                 Vector3 dp = avgPosition[i] - positions[i];
                 Vector3 dv = avgVelocity[i] - velocities[i];
 
-                var rng = new random(time + (uint)(10*i));
 
-                Vector3 offset = new Vector3(rng.NextFloat() - 0.5f, 0, rng.NextFloat() - 0.5f).normalized;
 
-                currentVelocity = (dp + dv*moveTime + offset*diskSize/2).normalized * moveSpeed;
+                Vector3 offset = Vector3.zero;
+
+                var rng = new random(time + (uint)(10 * i));
+                if (!triggered[i]) {
+                    offset = new Vector3(rng.NextFloat() - 0.5f, 0, rng.NextFloat() - 0.5f).normalized;
+                }
+
+
+                //currentVelocity = (dp + dv * moveTime + offset * diskSize / 2).normalized * moveSpeed;
+                currentVelocity = (dp + offset*diskSize/2).normalized * moveSpeed;
 
                 if (currentVelocity.sqrMagnitude > 0) {
                     transform.rotation = Quaternion.LookRotation(currentVelocity, Vector3.up);
                 }
 
 
-
-                if (dp.sqrMagnitude <= diskSize*diskSize || rng.NextFloat() < wanderChance || numNeighbors[i] > neighborLimit) {
+                //never wander randomly if we're triggered
+                if (!triggered[i] && (dp.sqrMagnitude <= diskSize*diskSize || rng.NextFloat() < wanderChance) ) {
                     //currentVelocity = -centroid; //reflect centroid and go there;
                     //currentVelocity = currentVelocity.normalized * moveSpeed;
                     currentVelocity = new Vector3(0, 0, moveSpeed) * math.min(1, dp.sqrMagnitude / diskSize / diskSize);
@@ -274,6 +332,7 @@ public class HordeManager : MonoBehaviour {
             if (timer[i] > idleTime + moveTime) {
                 currentVelocity = Vector3.zero;
                 timer[i] -= idleTime + moveTime;
+                triggered[i] = false;
             }
 
 
@@ -294,5 +353,6 @@ public class HordeManager : MonoBehaviour {
 
         }
     }
+
 
 }
