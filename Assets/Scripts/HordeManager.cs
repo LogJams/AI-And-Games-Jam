@@ -24,6 +24,7 @@ public class HordeManager : MonoBehaviour {
 
     private NativeArray<Vector3> playerPosition;
 
+
     private Queue<int> triggerBuffer;
     private Queue<(int, Vector3)> triggerLocations;
     private Queue<int> unTriggerBuffer;
@@ -31,15 +32,13 @@ public class HordeManager : MonoBehaviour {
     private Queue<(int, Vector3)> moveZombieBuffer;
 
 
-
     [Header("Horde Parameters")]
     public int hordeSize = 10000;
 
     public Vector3 spawnBounds = new Vector3(100, 0, 100);
-    public float spawnHeight = 0f;
 
     public Transform zombiePrefab;
-
+    public Terrain terrain;
 
     //zombie behaviors which are stored in job structs
     private DynamicsJob dynamicsJob;
@@ -50,6 +49,7 @@ public class HordeManager : MonoBehaviour {
 
     [Header("Zombie Behavior Settings")]
     public float moveSpeed = 1.0f;
+    public float rotSpeed = 60f;
     public float moveTime = 2.5f;
     public float idleTime = 5.5f;
 
@@ -88,7 +88,7 @@ public class HordeManager : MonoBehaviour {
         timer = new NativeArray<float>(hordeSize, Allocator.Persistent);
 
         triggered = new NativeArray<bool>(hordeSize, Allocator.Persistent);
-        
+
         triggerBuffer = new Queue<int>();
         unTriggerBuffer = new Queue<int>();
         triggerLocations = new Queue<(int,Vector3)>();
@@ -99,12 +99,8 @@ public class HordeManager : MonoBehaviour {
 
         for (int i = 0; i < hordeSize; i++) {
 
-            float distanceX = Random.Range(-spawnBounds.x / 2, spawnBounds.x / 2);
-            float distanceZ = Random.Range(-spawnBounds.z / 2, spawnBounds.z / 2);
-            Vector3 spawnPoint = transform.position + Vector3.up * spawnHeight
-                                    + new Vector3(distanceX, 0, distanceZ);
 
-            Transform t = (Transform)Instantiate(zombiePrefab, spawnPoint, Quaternion.identity);
+            Transform t = (Transform)Instantiate(zombiePrefab, GetSpawnLocation(), Quaternion.identity);
             t.GetComponent<Zombie>().index = i;
             t.parent = this.transform;
 
@@ -118,6 +114,7 @@ public class HordeManager : MonoBehaviour {
 
             timer[i] = Random.Range(0, moveTime + idleTime);
             triggered[i] = false;
+
         }
 
 
@@ -138,6 +135,7 @@ public class HordeManager : MonoBehaviour {
             positions = position,
             velocities = velocity,
             moveSpeed = this.moveSpeed,
+            rotSpeed = this.rotSpeed,
             moveTime = this.moveTime,
             idleTime = this.idleTime,
             bounds = spawnBounds,
@@ -160,13 +158,16 @@ public class HordeManager : MonoBehaviour {
         //update the player position nativearray before jobs start
         playerPosition[0] = player.position;
 
-        //job 1: update all neighborhood info
+
+        //job: update all neighborhood info
         nbhdHandle = behaviorJob.Schedule(transforms);
+
 
         foreach (var p in position) {
             centroid += p;
         }
         centroid = centroid / hordeSize;
+
 
         //job 2: do the dynamics!
         dynamicsJob.deltaTime = Time.deltaTime;
@@ -205,10 +206,11 @@ public class HordeManager : MonoBehaviour {
     }
 
     public void OnZombieCollision(int idx, int other) {
-        //did you know zombies stick together?
-        Vector3 vel = (velocity[idx] + velocity[other]) / 2 * restitution;
-        velocity[idx]   = vel;
-        velocity[other] = vel;
+        //todo: handle this in a velocity update queue or something in LateUpdate
+        //right now just have the zombies switch speeds to avoid crowding
+        Vector3 vel = velocity[idx];
+        velocity[idx]   = velocity[other] * restitution;
+        velocity[other] = vel * restitution;
     }
 
     public void ZombieTrigger(int idx, Vector3 location) {
@@ -224,13 +226,25 @@ public class HordeManager : MonoBehaviour {
     public void ZombieDeath(int idx) {
         //move the zombie across the map
         //todo: randomly pick a location far from the player (or in a horde far from the player?)
-        float distanceX = Random.Range(-spawnBounds.x / 2, spawnBounds.x / 2);
-        float distanceZ = Random.Range(-spawnBounds.z / 2, spawnBounds.z / 2);
-        Vector3 spawnPoint = transform.position + Vector3.up * spawnHeight
-                                + new Vector3(distanceX, 0, distanceZ);
-        moveZombieBuffer.Enqueue( (idx, spawnPoint ) );
 
+        moveZombieBuffer.Enqueue( (idx, GetSpawnLocation() ) );
     }
+
+
+    Vector3 GetSpawnLocation() {
+        Vector3 spawnPoint = new Vector3(Random.Range(-spawnBounds.x / 2, spawnBounds.x / 2), 0, Random.Range(-spawnBounds.z / 2, spawnBounds.z / 2));
+
+        RaycastHit hitInfo;
+        if (Physics.Raycast(spawnPoint + new Vector3(0, 10, 0), Vector3.down, out hitInfo)) {
+            spawnPoint = hitInfo.point;
+        }
+        else {
+            spawnPoint += Vector3.up * terrain.SampleHeight(spawnPoint);
+        }
+
+        return spawnPoint;
+    }
+
 
     private void OnDestroy() {
         position.Dispose();
@@ -241,6 +255,7 @@ public class HordeManager : MonoBehaviour {
         timer.Dispose();
         triggered.Dispose();
         playerPosition.Dispose();
+
     }
 
 
@@ -307,6 +322,7 @@ public class HordeManager : MonoBehaviour {
         public uint time;
         public float deltaTime;
         public float moveSpeed;
+        public float rotSpeed;
         public float moveTime;
         public float idleTime;
 
@@ -325,23 +341,30 @@ public class HordeManager : MonoBehaviour {
             //we are moving!
             if ( (timer[i] > idleTime && timer[i] < idleTime + deltaTime) || triggered[i]) {
                 Vector3 dp = avgPosition[i] - positions[i];
+                dp.y = 0;
                 Vector3 dv = avgVelocity[i] - velocities[i];
 
 
 
                 Vector3 offset = Vector3.zero;
 
-                var rng = new random(time + (uint)(10 * i));
+                var rng = new random(time + (uint)(10 * (i+1)));
                 if (!triggered[i]) {
                     offset = new Vector3(rng.NextFloat() - 0.5f, 0, rng.NextFloat() - 0.5f).normalized;
                 }
 
-
+                
                 //currentVelocity = (dp + dv * moveTime + offset * diskSize / 2).normalized * moveSpeed;
                 currentVelocity = (dp + offset*diskSize/2).normalized * moveSpeed;
-
-                if (currentVelocity.sqrMagnitude > 0) {
-                    transform.rotation = Quaternion.LookRotation(currentVelocity, Vector3.up);
+                Quaternion lookAt = Quaternion.LookRotation(currentVelocity, Vector3.up);
+                float angle = Quaternion.Angle(transform.rotation, lookAt);
+                float dA = (angle) / (rotSpeed) * deltaTime;
+                if (angle < 0.9f) {
+                    transform.rotation = Quaternion.Lerp(transform.rotation, lookAt , dA);
+                    currentVelocity = Vector3.Lerp(currentVelocity, transform.rotation * new Vector3(0, 0, moveSpeed), 0.5f);
+                }
+                else {
+                    transform.rotation = lookAt;
                 }
 
 
@@ -371,10 +394,10 @@ public class HordeManager : MonoBehaviour {
 
             }
 
-
+            currentPosition += currentVelocity * deltaTime;
             //update our saved position and velocity values
-            transform.position = currentPosition + currentVelocity * deltaTime;
-            positions[i]       = transform.position;
+            transform.position = currentPosition;
+            positions[i] = currentPosition;
             velocities[i] = currentVelocity;
 
         }

@@ -35,10 +35,14 @@ public class Zombie : MonoBehaviour {
         }
     }
 
-    public void Hit(int dmg) {
+    public void Hit(int dmg, Vector3 source) {
         health -= dmg;
         if (health <= 0) {
             HordeManager.instance.ZombieDeath(index);
+        }
+        else {
+            source.y = 0;
+            HordeManager.instance.ZombieTrigger(index, source);
         }
     }
 }

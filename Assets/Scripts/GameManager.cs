@@ -28,7 +28,7 @@ public class GameManager : MonoBehaviour {
     }
 
     private void Start() {
-        player.OnFireWeapon += OnGunshot;
+        player.OnFireWeapon += PlayerAttack;
         Time.timeScale = TimeScale;
 
     }
@@ -36,8 +36,8 @@ public class GameManager : MonoBehaviour {
 
 
 
-    public void OnGunshot(System.Object src, WeaponEvent e) {
-        OnNoiseEvent?.Invoke(src, new NoiseEvent() { location = player.transform.position, sqRange = e.radius * e.radius });
+    public void PlayerAttack(System.Object src, WeaponEvent e) {
+        OnNoiseEvent?.Invoke(src, new NoiseEvent() { location = player.transform.position, sqRange = e.weaponData.soundRadius * e.weaponData.soundRadius });
     }
 
 

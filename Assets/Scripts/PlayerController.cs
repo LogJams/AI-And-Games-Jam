@@ -13,49 +13,87 @@ public class PlayerController : MonoBehaviour {
 
 
     LineRenderer line;
-    public Weapon weapon;
+    public List<Weapon> weapons;
+    int currentWeapon = 0;
 
     public event System.EventHandler<WeaponEvent> OnFireWeapon;
+    public event System.EventHandler<WeaponEvent> OnSwitchWeapon;
 
+
+    private void Awake() {
+        //disable our other weapons
+        for (int i = 0; i < weapons.Count; i++) {
+            weapons[i].gameObject.SetActive(i == currentWeapon);
+        }
+        cc = GetComponent<CharacterController>();
+        line = GetComponent<LineRenderer>();
+    }
 
     // Start is called before the first frame update
     void Start() {
-        cc = GetComponent<CharacterController>();
-        line = GetComponent<LineRenderer>();
+
+    }
+
+    public Weapon CurrentWeapon() {
+        return weapons[currentWeapon];
     }
 
     // Update is called once per frame
     void Update() {
 
-        //movement
+        SelectWeapon();
+
         Movement();
         Vector3 aim = Look();
 
         //todo: perhaps have this per weapon, and use to to figure out what to shoot
-        line.SetPosition(0, weapon.transform.position);
+        line.SetPosition(0, weapons[currentWeapon].transform.position);
         line.SetPosition(1, aim);
 
 
         //attack by clicking
         if (Input.GetMouseButtonDown(0)) {
 
-            if (weapon.CanFire()) {
+            if (weapons[currentWeapon].CanAttack()) {
                 //attack!
-                WeaponEvent we = weapon.Fire(lookTarget);
+                WeaponEvent we = weapons[currentWeapon].Attack(lookTarget);
 
                 OnFireWeapon?.Invoke(this.gameObject, we);
 
             }
             else {
-
+                //notify the player, perhaps play a click sound if it's a gun?
 
             }
-
         }
 
 
 
     }
+
+    void SelectWeapon() {
+        if (Input.GetKeyDown(KeyCode.Alpha1) && currentWeapon != 0) {
+            SwitchWeapon(0);
+        }
+        if (Input.GetKeyDown(KeyCode.Alpha2) && currentWeapon != 1) {
+            SwitchWeapon(1);
+        }
+        if (Input.GetKeyDown(KeyCode.Alpha3) && currentWeapon != 2) {
+        //    SwitchWeapon(2);
+        }
+    }
+
+    void SwitchWeapon(int idx) {
+        weapons[currentWeapon].gameObject.SetActive(false);
+        weapons[currentWeapon].PutAway();
+        currentWeapon = idx;
+        weapons[currentWeapon].gameObject.SetActive(true);
+        weapons[currentWeapon].Equip();
+        //play some animations??
+
+        OnSwitchWeapon?.Invoke(this.transform, new WeaponEvent() { weaponData = weapons[currentWeapon].GetWeaponData() });
+    }
+
 
     void Movement() {
         //moving with the keyboard
