@@ -234,13 +234,21 @@ public class HordeManager : MonoBehaviour {
     Vector3 GetSpawnLocation() {
         Vector3 spawnPoint = new Vector3(Random.Range(-spawnBounds.x / 2, spawnBounds.x / 2), 0, Random.Range(-spawnBounds.z / 2, spawnBounds.z / 2));
 
+
         RaycastHit hitInfo;
-        if (Physics.Raycast(spawnPoint + new Vector3(0, 10, 0), Vector3.down, out hitInfo)) {
+        if (Physics.Raycast(spawnPoint + new Vector3(0, 10, 0), Vector3.down, out hitInfo, Mathf.Infinity,
+                                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) {
             spawnPoint = hitInfo.point;
         }
         else {
             spawnPoint += Vector3.up * terrain.SampleHeight(spawnPoint);
         }
+
+        //redo if we're too high up
+        if (spawnPoint.y > terrain.SampleHeight(spawnPoint) + 2) {
+            return GetSpawnLocation();
+        }
+
 
         return spawnPoint;
     }
