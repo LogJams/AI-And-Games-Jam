@@ -25,8 +25,12 @@ public class HordeManager : MonoBehaviour {
     private NativeArray<Vector3> playerPosition;
 
     private Queue<int> triggerBuffer;
-    private Queue<Vector3> triggerLocations;
+    private Queue<(int, Vector3)> triggerLocations;
     private Queue<int> unTriggerBuffer;
+
+    private Queue<(int, Vector3)> moveZombieBuffer;
+
+
 
     [Header("Horde Parameters")]
     public int hordeSize = 10000;
@@ -56,7 +60,8 @@ public class HordeManager : MonoBehaviour {
 
 
     [Header("Player Reference")]
-    public Transform player; public float playerTrackDistance = 5f;
+    public Transform player; 
+    public float playerTrackDistance = 5f;
 
     Vector3 centroid;
 
@@ -72,6 +77,7 @@ public class HordeManager : MonoBehaviour {
     }
 
     void Start() {
+
         position   = new NativeArray<Vector3>(hordeSize, Allocator.Persistent);
         velocity   = new NativeArray<Vector3>(hordeSize, Allocator.Persistent);
         nbPosition = new NativeArray<Vector3>(hordeSize, Allocator.Persistent);
@@ -85,7 +91,8 @@ public class HordeManager : MonoBehaviour {
         
         triggerBuffer = new Queue<int>();
         unTriggerBuffer = new Queue<int>();
-        triggerLocations = new Queue<Vector3>();
+        triggerLocations = new Queue<(int,Vector3)>();
+        moveZombieBuffer = new Queue<(int, Vector3)>();
 
         playerPosition = new NativeArray<Vector3>(1,Allocator.Persistent);
         playerPosition[0] = player.position;
@@ -175,11 +182,20 @@ public class HordeManager : MonoBehaviour {
         while (triggerBuffer.Count > 0) {
             int idx = triggerBuffer.Dequeue();
             triggered[idx] = true;
-            nbPosition[idx] = triggerLocations.Dequeue();
+        }
+        while (triggerLocations.Count > 0) {
+            var (idx, pos) = triggerLocations.Dequeue();
+            triggered[idx] = true;
+            nbPosition[idx] = pos;
             nbVelocity[idx] = Vector3.zero;
         }
         while (unTriggerBuffer.Count > 0) {
             triggered[unTriggerBuffer.Dequeue()] = false;
+        }
+        while (moveZombieBuffer.Count > 0) {
+            var (idx, pos) = moveZombieBuffer.Dequeue();
+            triggered[idx] = false;
+            transforms[idx].position = pos;
         }
     }
 
@@ -197,13 +213,23 @@ public class HordeManager : MonoBehaviour {
 
     public void ZombieTrigger(int idx, Vector3 location) {
         //todo: handle this in a trigger queue that's updated after dynamicsHandle is completed
-        triggerBuffer.Enqueue(idx);
-        triggerLocations.Enqueue(location);
+        triggerLocations.Enqueue( (idx, location) );
     }
 
     public void ZombieUnTrigger(int idx) {
         //todo: handle this in a trigger queue that's updated after dynamicsHandle is completed
         unTriggerBuffer.Enqueue(idx);
+    }
+
+    public void ZombieDeath(int idx) {
+        //move the zombie across the map
+        //todo: randomly pick a location far from the player (or in a horde far from the player?)
+        float distanceX = Random.Range(-spawnBounds.x / 2, spawnBounds.x / 2);
+        float distanceZ = Random.Range(-spawnBounds.z / 2, spawnBounds.z / 2);
+        Vector3 spawnPoint = transform.position + Vector3.up * spawnHeight
+                                + new Vector3(distanceX, 0, distanceZ);
+        moveZombieBuffer.Enqueue( (idx, spawnPoint ) );
+
     }
 
     private void OnDestroy() {

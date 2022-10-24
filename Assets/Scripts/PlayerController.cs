@@ -11,6 +11,8 @@ public class PlayerController : MonoBehaviour {
     public float moveSpeed = 2.5f; // m/s
     public float rotSpeed = 30f;   // rad/s
 
+
+    LineRenderer line;
     public Weapon weapon;
 
     public event System.EventHandler<WeaponEvent> OnFireWeapon;
@@ -19,6 +21,7 @@ public class PlayerController : MonoBehaviour {
     // Start is called before the first frame update
     void Start() {
         cc = GetComponent<CharacterController>();
+        line = GetComponent<LineRenderer>();
     }
 
     // Update is called once per frame
@@ -27,6 +30,11 @@ public class PlayerController : MonoBehaviour {
         //movement
         Movement();
         Vector3 aim = Look();
+
+        //todo: perhaps have this per weapon, and use to to figure out what to shoot
+        line.SetPosition(0, weapon.transform.position);
+        line.SetPosition(1, aim);
+
 
         //attack by clicking
         if (Input.GetMouseButtonDown(0)) {
@@ -64,7 +72,10 @@ public class PlayerController : MonoBehaviour {
             lookTarget = hitInfo.point;
             lookTarget.y = transform.position.y;
             transform.LookAt(lookTarget, Vector3.up);
-            return hitInfo.point;
+            //lift the hit point up 1m to the center of mass
+            Vector3 point = hitInfo.point;
+            point.y = 1f;
+            return point;
 
         } else {
             return transform.position;

@@ -6,6 +6,7 @@ public class Zombie : MonoBehaviour {
 
     public int index;
 
+    public int health = 5;
 
     // Start is called before the first frame update
     void Start() {
@@ -31,6 +32,13 @@ public class Zombie : MonoBehaviour {
         //otherwise just stop
         else {
             HordeManager.instance.OnZombieCollision(index);
+        }
+    }
+
+    public void Hit(int dmg) {
+        health -= dmg;
+        if (health <= 0) {
+            HordeManager.instance.ZombieDeath(index);
         }
     }
 }
