@@ -10,6 +10,8 @@ public class WeaponData : ScriptableObject {
     public int damage = 5;
     public float cooldown = 10f;
 
+    public float range = 50f;
+
     public Sprite icon;
     public AudioClip attackSound;
 }

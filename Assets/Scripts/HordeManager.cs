@@ -39,6 +39,7 @@ public class HordeManager : MonoBehaviour {
 
     public Transform zombiePrefab;
     public Terrain terrain;
+    List<Zombie> zombies;
 
     //zombie behaviors which are stored in job structs
     private DynamicsJob dynamicsJob;
@@ -97,13 +98,17 @@ public class HordeManager : MonoBehaviour {
         playerPosition = new NativeArray<Vector3>(1,Allocator.Persistent);
         playerPosition[0] = player.position;
 
+        zombies = new List<Zombie>(hordeSize);
+
         for (int i = 0; i < hordeSize; i++) {
 
 
             Transform t = (Transform)Instantiate(zombiePrefab, GetSpawnLocation(), Quaternion.identity);
-            t.GetComponent<Zombie>().index = i;
+            Zombie z = t.GetComponent<Zombie>();
+            zombies.Add(z);
+            z.index = i;
+            
             t.parent = this.transform;
-
             transforms.Add(t);
 
             position[i] = transforms[i].position;
@@ -198,6 +203,21 @@ public class HordeManager : MonoBehaviour {
             triggered[idx] = false;
             transforms[idx].position = pos;
         }
+
+        //only update zombies near the fustrum area?
+        List<Collider> objs = new List<Collider>( Physics.OverlapBox(player.transform.position, new Vector3(50f, 10f, 25f), 
+            Quaternion.identity, LayerMask.GetMask("Zombie"), QueryTriggerInteraction.Ignore) );
+
+        Zombie z = null;
+        foreach (var obj in objs) {
+            if (obj.TryGetComponent<Zombie>(out z)) {
+                if (!z.anim.enabled) {
+                    z.anim.enabled = true;
+                }
+                z.anim.SetFloat("speed", velocity[z.index].sqrMagnitude);
+            }
+        }
+       
     }
 
     public void OnZombieCollision(int idx) {

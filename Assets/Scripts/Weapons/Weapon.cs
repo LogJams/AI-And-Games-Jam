@@ -27,7 +27,7 @@ public abstract class Weapon : MonoBehaviour {
     public abstract bool CanAttack();
 
     //actually do the attack
-    public abstract WeaponEvent Attack(Vector3 target);
+    public abstract WeaponEvent Attack();
 
     public abstract void PutAway();
 

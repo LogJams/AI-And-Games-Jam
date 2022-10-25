@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class MeleeWeapon : Weapon {
-    public override WeaponEvent Attack(Vector3 target) {
+    public override WeaponEvent Attack() {
         throw new System.NotImplementedException();
     }
 
