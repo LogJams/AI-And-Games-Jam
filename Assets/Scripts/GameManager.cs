@@ -37,7 +37,8 @@ public class GameManager : MonoBehaviour {
 
 
     public void PlayerAttack(System.Object src, WeaponEvent e) {
-        OnNoiseEvent?.Invoke(src, new NoiseEvent() { location = player.transform.position, sqRange = e.weaponData.soundRadius * e.weaponData.soundRadius });
+        WeaponData weaponData = e.thisWeapon.GetWeaponData();
+        OnNoiseEvent?.Invoke(src, new NoiseEvent() { location = player.transform.position, sqRange = weaponData.soundRadius * weaponData.soundRadius });
     }
 
 

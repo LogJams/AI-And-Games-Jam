@@ -71,7 +71,6 @@ GameObject:
   - component: {fileID: 3319718353044483725}
   - component: {fileID: 3517102280329695830}
   - component: {fileID: 4324261146346866790}
-  - component: {fileID: 7301915829613161930}
   m_Layer: 0
   m_Name: Door_Frame_00
   m_TagString: Untagged
@@ -144,20 +143,6 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &7301915829613161930
-MeshCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2090263918386545551}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
-  serializedVersion: 4
-  m_Convex: 0
-  m_CookingOptions: 30
-  m_Mesh: {fileID: -2383896503608867838, guid: 9a11dc181bf288f478a5d6acba2e86ef, type: 3}
 --- !u!1 &6230432470829636577
 GameObject:
   m_ObjectHideFlags: 0

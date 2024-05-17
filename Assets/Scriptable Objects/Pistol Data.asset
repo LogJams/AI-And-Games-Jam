@@ -15,5 +15,6 @@ MonoBehaviour:
   soundRadius: 15
   damage: 1
   cooldown: 0.5
+  range: 50
   icon: {fileID: 21300000, guid: db04ee43e41e5aa46bcb0429f57547bd, type: 3}
-  attackSound: {fileID: 0}
+  attackSound: {fileID: 8300000, guid: c185daf684318be4697e6d492c5963c5, type: 3}

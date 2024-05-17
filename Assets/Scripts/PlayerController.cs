@@ -67,6 +67,7 @@ public class PlayerController : MonoBehaviour {
                 WeaponEvent we = weapons[currentWeapon].Attack();
 
                 OnFireWeapon?.Invoke(this.gameObject, we);
+                GetComponent<AudioSource>().PlayOneShot(weapons[currentWeapon].GetWeaponData().attackSound);
 
             }
             else {
@@ -99,7 +100,7 @@ public class PlayerController : MonoBehaviour {
     IEnumerator SwitchWeapon(int idx) {
         weaponBusy = true;
 
-        OnSwitchWeapon?.Invoke(this.transform, new WeaponEvent() { weaponData = weapons[currentWeapon].GetWeaponData() });
+        OnSwitchWeapon?.Invoke(this.transform, new WeaponEvent() { thisWeapon = weapons[idx] });
 
         //if we switched from the rifle
         if (currentWeapon == 0) {

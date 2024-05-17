@@ -83,7 +83,7 @@ public class RangedWeapon : Weapon {
             clipCount = clipSize;
         }
 
-        return new WeaponEvent() { weaponData = this.weaponData };
+        return new WeaponEvent() { thisWeapon = this };
     }
 
 

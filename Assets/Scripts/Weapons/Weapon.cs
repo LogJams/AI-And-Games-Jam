@@ -4,7 +4,7 @@ using UnityEngine;
 
 
 public class WeaponEvent : System.EventArgs {
-    public WeaponData weaponData;
+    public Weapon thisWeapon;
 }
 
 

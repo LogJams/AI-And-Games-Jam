@@ -21,7 +21,7 @@ public class UiWeaponPanel : MonoBehaviour {
     }
 
     void WeaponUpdateEvent(System.Object src, WeaponEvent e) {
-        UpdateDisplay(player.CurrentWeapon());
+        UpdateDisplay(e.thisWeapon);
     }
 
 
